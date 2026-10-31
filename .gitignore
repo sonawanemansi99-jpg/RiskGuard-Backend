@@ -1,0 +1,20 @@
+node_modules/
+.env
+.DS_Store
+# Spark checkpoints
+streaming/spark/checkpoints/
+
+# Python virtual environments
+.venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment secrets
+.env
+**/.env
+
+# macOS files
+.DS_Store

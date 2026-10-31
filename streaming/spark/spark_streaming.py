@@ -47,6 +47,7 @@ def main():
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
         .option("subscribe", KAFKA_TOPIC)
         .option("startingOffsets", "latest")
+        .option("failOnDataLoss", "false")
         .load()
     )
 
