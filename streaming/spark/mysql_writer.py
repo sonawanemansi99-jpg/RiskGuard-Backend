@@ -251,7 +251,7 @@ def save_risk_batch(pdf, drift_events=None):
                     risk_level,
                     fraud_probability,
                     reasons,
-                    "v1",
+                    "ensemble-v1",
                 ),
             )
 

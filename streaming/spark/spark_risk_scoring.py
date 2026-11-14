@@ -23,9 +23,13 @@ from mysql_writer import save_risk_batch
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 
+# Updated: Load Balanced Ensemble Classifier
 MODEL_PATH = (
-    BASE_DIR / "ml" / "models" / "riskguard_model.pkl"
+    BASE_DIR / "ml" / "models" / "riskguard_ensemble.pkl"
 )
+
+MODEL_NAME = "Balanced Ensemble"
+MODEL_VERSION = "ensemble-v1"
 
 KAFKA_SERVER = "localhost:9092"
 KAFKA_TOPIC = "bank_transactions"
@@ -38,10 +42,10 @@ CHECKPOINT_PATH = (
 
 
 # ==========================================
-# 2. LOAD ML MODEL
+# 2. LOAD ENSEMBLE MODEL
 # ==========================================
 
-print("Loading RiskGuard ML model...")
+print("Loading RiskGuard Balanced Ensemble model...")
 
 if not MODEL_PATH.exists():
     raise FileNotFoundError(
@@ -50,7 +54,8 @@ if not MODEL_PATH.exists():
 
 model = joblib.load(MODEL_PATH)
 
-print("ML model loaded successfully!")
+print("Balanced Ensemble model loaded successfully!")
+print("Model path:", MODEL_PATH)
 
 
 # ==========================================
@@ -122,7 +127,10 @@ def score_batch(batch_df, batch_id):
     # Convert Spark batch into Pandas DataFrame
     pdf = batch_df.toPandas()
 
-    # Validate required fields
+    # ======================================
+    # VALIDATE TRANSACTION DATA
+    # ======================================
+
     pdf = pdf.dropna(
         subset=[
             "transaction_ref",
@@ -172,11 +180,12 @@ def score_batch(batch_df, batch_id):
     pdf["transactions_last_hour"] = 0
 
     # ======================================
-    # RANDOM FOREST PREDICTION
+    # BALANCED ENSEMBLE PREDICTION
     # ======================================
 
-    print("Running ML risk prediction...")
+    print("Running Balanced Ensemble risk prediction...")
 
+    # Ensemble fraud probabilities
     probabilities = model.predict_proba(
         pdf[FEATURE_COLUMNS]
     )[:, 1]
@@ -459,7 +468,10 @@ def main():
     print("===================================")
 
     print("Kafka Topic:", KAFKA_TOPIC)
-    print("ML Model: Random Forest")
+    print("ML Model:", MODEL_NAME)
+    print("Model Version:", MODEL_VERSION)
+    print("Classifiers: Random Forest + Logistic Regression")
+    print("Ensemble Method: Soft Voting")
     print("Drift Detection: ADWIN")
     print("Database: MySQL (riskguard_db)")
     print("Streaming Status: ACTIVE")

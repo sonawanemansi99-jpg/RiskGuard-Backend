@@ -1,4 +1,3 @@
-
 const dashboardService = require("../services/dashboardService");
 
 function handleDashboardRequest(serviceMethod, message) {
@@ -48,6 +47,26 @@ module.exports = {
   getHighRiskTransactions: handleDashboardRequest(
     dashboardService.getHighRiskTransactions,
     "High-risk transactions retrieved successfully"
+  ),
+
+  getLocationDistribution: handleDashboardRequest(
+    dashboardService.getLocationDistribution,
+    "Location distribution retrieved successfully"
+  ),
+
+  getPaymentMethodDistribution: handleDashboardRequest(
+    dashboardService.getPaymentMethodDistribution,
+    "Payment method distribution retrieved successfully"
+  ),
+
+  getRiskTrends: handleDashboardRequest(
+    dashboardService.getRiskTrends,
+    "Risk trends retrieved successfully"
+  ),
+
+  getAlertTrends: handleDashboardRequest(
+    dashboardService.getAlertTrends,
+    "Alert trends retrieved successfully"
   ),
 
   getModelPerformance: handleDashboardRequest(

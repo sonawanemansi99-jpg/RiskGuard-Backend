@@ -1,4 +1,3 @@
-
 const pool = require("../config/database");
 
 // GET ALL ALERTS
@@ -8,9 +7,15 @@ const getAllAlerts = async () => {
       a.*,
       r.risk_score,
       r.risk_level,
+      r.reasons,
       t.transaction_ref,
       t.customer_ref,
-      t.amount
+      t.amount,
+      t.currency,
+      t.location,
+      t.device_id,
+      t.payment_method,
+      t.transaction_time
     FROM alerts a
     JOIN risk_assessments r
       ON a.risk_assessment_id = r.id
@@ -30,9 +35,15 @@ const getAlertById = async (id) => {
       a.*,
       r.risk_score,
       r.risk_level,
+      r.reasons,
       t.transaction_ref,
       t.customer_ref,
-      t.amount
+      t.amount,
+      t.currency,
+      t.location,
+      t.device_id,
+      t.payment_method,
+      t.transaction_time
     FROM alerts a
     JOIN risk_assessments r
       ON a.risk_assessment_id = r.id

@@ -54,13 +54,14 @@ async function createRiskAssessment(req, res) {
 
 async function getRiskAssessments(req, res) {
     try {
-        const assessments =
-            await riskAssessmentService.getAllRiskAssessments();
+        const result =
+            await riskAssessmentService.getAllRiskAssessments(req.query);
 
         return res.status(200).json({
             success: true,
-            count: assessments.length,
-            data: assessments
+            count: result.data.length,
+            data: result.data,
+            pagination: result.pagination
         });
     } catch (error) {
         console.error("Get risk assessments error:", error.message);

@@ -1,4 +1,3 @@
-
 const pool = require("../config/database");
 
 // Get transactions with pagination, search, filters, and sorting
@@ -10,6 +9,11 @@ async function getAllTransactions(options = {}) {
         location = "",
         minAmount,
         maxAmount,
+        deviceId = "",
+        paymentMethod = "",
+        riskLevel = "",
+        startDate = "",
+        endDate = "",
         sortBy = "transaction_time",
         order = "DESC"
     } = options;
@@ -22,38 +26,34 @@ async function getAllTransactions(options = {}) {
     );
     const offset = (currentPage - 1) * pageSize;
 
-    // Only allow sorting by known database columns
-    const allowedSortColumns = [
-        "id",
-        "transaction_time",
-        "amount",
-        "transaction_ref",
-        "customer_ref"
-    ];
+    // Allowed sort columns
+    const allowedSortColumns = {
+        id: "t.id",
+        transaction_time: "t.transaction_time",
+        amount: "t.amount",
+        transaction_ref: "t.transaction_ref",
+        customer_ref: "t.customer_ref",
+        location: "t.location",
+        risk_score: "r.risk_score",
+        risk_level: "r.risk_level"
+    };
 
-    const safeSortBy = allowedSortColumns.includes(sortBy)
-        ? sortBy
-        : "transaction_time";
-
-    const safeOrder = String(order).toUpperCase() === "ASC"
-        ? "ASC"
-        : "DESC";
+    const safeSortBy = allowedSortColumns[sortBy] || "t.transaction_time";
+    const safeOrder = String(order).toUpperCase() === "ASC" ? "ASC" : "DESC";
 
     const conditions = [];
     const values = [];
 
     // Search transaction and customer references
-    if (search.trim()) {
-        conditions.push(
-            "(transaction_ref LIKE ? OR customer_ref LIKE ?)"
-        );
+    if (search && search.trim()) {
+        conditions.push("(t.transaction_ref LIKE ? OR t.customer_ref LIKE ?)");
         const searchValue = `%${search.trim()}%`;
         values.push(searchValue, searchValue);
     }
 
     // Filter by location
-    if (location.trim()) {
-        conditions.push("location LIKE ?");
+    if (location && location.trim()) {
+        conditions.push("t.location LIKE ?");
         values.push(`%${location.trim()}%`);
     }
 
@@ -63,7 +63,7 @@ async function getAllTransactions(options = {}) {
         if (!Number.isFinite(min) || min < 0) {
             throw new Error("minAmount must be a valid non-negative number");
         }
-        conditions.push("amount >= ?");
+        conditions.push("t.amount >= ?");
         values.push(min);
     }
 
@@ -73,7 +73,7 @@ async function getAllTransactions(options = {}) {
         if (!Number.isFinite(max) || max < 0) {
             throw new Error("maxAmount must be a valid non-negative number");
         }
-        conditions.push("amount <= ?");
+        conditions.push("t.amount <= ?");
         values.push(max);
     }
 
@@ -87,24 +87,70 @@ async function getAllTransactions(options = {}) {
         throw new Error("minAmount cannot be greater than maxAmount");
     }
 
+    // Filter by device_id
+    if (deviceId && deviceId.trim()) {
+        conditions.push("t.device_id LIKE ?");
+        values.push(`%${deviceId.trim()}%`);
+    }
+
+    // Filter by payment_method
+    if (paymentMethod && paymentMethod.trim()) {
+        conditions.push("t.payment_method = ?");
+        values.push(paymentMethod.trim().toUpperCase());
+    }
+
+    // Filter by risk_level
+    if (riskLevel && riskLevel.trim()) {
+        conditions.push("UPPER(r.risk_level) = ?");
+        values.push(riskLevel.trim().toUpperCase());
+    }
+
+    // Date range filters
+    if (startDate && startDate.trim()) {
+        conditions.push("t.transaction_time >= ?");
+        values.push(startDate.trim());
+    }
+    if (endDate && endDate.trim()) {
+        conditions.push("t.transaction_time <= ?");
+        values.push(endDate.trim());
+    }
+
     const whereClause = conditions.length
         ? `WHERE ${conditions.join(" AND ")}`
         : "";
 
-    // Get the total number of matching transactions
+    // Count query
     const [countRows] = await pool.execute(
         `SELECT COUNT(*) AS total
-         FROM transactions
+         FROM transactions t
+         LEFT JOIN risk_assessments r ON r.transaction_id = t.id
          ${whereClause}`,
         values
     );
 
     const total = Number(countRows[0].total);
 
-    // Get the requested page
+    // Data query with joined risk assessments
     const [rows] = await pool.execute(
-        `SELECT *
-         FROM transactions
+        `SELECT
+            t.id,
+            t.transaction_ref,
+            t.customer_ref,
+            t.amount,
+            t.currency,
+            t.location,
+            t.device_id,
+            t.payment_method,
+            t.merchant_category,
+            t.transaction_time,
+            t.created_at,
+            r.risk_score,
+            r.risk_level,
+            r.fraud_probability,
+            r.model_version,
+            r.reasons
+         FROM transactions t
+         LEFT JOIN risk_assessments r ON r.transaction_id = t.id
          ${whereClause}
          ORDER BY ${safeSortBy} ${safeOrder}
          LIMIT ? OFFSET ?`,
@@ -142,6 +188,7 @@ async function createTransaction(data) {
         currency = "INR",
         location,
         device_id,
+        payment_method,
         merchant_category,
         transaction_time
     } = data;
@@ -157,10 +204,11 @@ async function createTransaction(data) {
             currency,
             location,
             device_id,
+            payment_method,
             merchant_category,
             transaction_time
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             transaction_ref,
             customer_ref,
@@ -168,6 +216,7 @@ async function createTransaction(data) {
             currency,
             location ?? null,
             device_id ?? null,
+            payment_method ?? null,
             merchant_category ?? null,
             formattedTransactionTime
         ]

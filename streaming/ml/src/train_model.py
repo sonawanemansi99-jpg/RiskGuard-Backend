@@ -6,9 +6,10 @@ from pathlib import Path
 
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.linear_model import LogisticRegression
 
 from sklearn.metrics import (
     accuracy_score,
@@ -20,12 +21,20 @@ from sklearn.metrics import (
 )
 
 
-# Project paths
+# ==========================================
+# 1. PROJECT PATHS
+# ==========================================
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 DATA_PATH = BASE_DIR / "data" / "bank_transactions.csv"
-MODEL_PATH = BASE_DIR / "models" / "riskguard_model.pkl"
 
+MODEL_PATH = BASE_DIR / "models" / "riskguard_ensemble.pkl"
+
+
+# ==========================================
+# 2. TRAIN ENSEMBLE CLASSIFIER
+# ==========================================
 
 def train_model():
 
@@ -35,7 +44,10 @@ def train_model():
 
     print("Dataset shape:", df.shape)
 
-    # Input features
+    # ======================================
+    # INPUT FEATURES
+    # ======================================
+
     feature_columns = [
         "amount",
         "hour",
@@ -50,7 +62,10 @@ def train_model():
     # Target: 0 = Legitimate, 1 = Fraud
     y = df["is_fraud"]
 
-    # Numerical and categorical features
+    # ======================================
+    # NUMERICAL & CATEGORICAL FEATURES
+    # ======================================
+
     numeric_features = [
         "amount",
         "hour",
@@ -63,10 +78,17 @@ def train_model():
         "merchant_category"
     ]
 
-    # Convert categorical features into numbers
+    # ======================================
+    # DATA PREPROCESSING
+    # ======================================
+
     preprocessor = ColumnTransformer(
         transformers=[
-            ("num", "passthrough", numeric_features),
+            (
+                "num",
+                StandardScaler(),
+                numeric_features
+            ),
             (
                 "cat",
                 OneHotEncoder(handle_unknown="ignore"),
@@ -75,22 +97,54 @@ def train_model():
         ]
     )
 
-    # Random Forest model
-    classifier = RandomForestClassifier(
+    # ======================================
+    # RANDOM FOREST CLASSIFIER
+    # ======================================
+
+    random_forest = RandomForestClassifier(
         n_estimators=100,
         random_state=42,
+        class_weight="balanced",
         n_jobs=-1
     )
 
-    # Complete ML pipeline
+    # ======================================
+    # LOGISTIC REGRESSION CLASSIFIER
+    # ======================================
+
+    logistic_regression = LogisticRegression(
+        max_iter=1000,
+        random_state=42,
+        class_weight="balanced"
+    )
+
+    # ======================================
+    # SOFT VOTING ENSEMBLE CLASSIFIER
+    # ======================================
+
+    ensemble_classifier = VotingClassifier(
+        estimators=[
+            ("random_forest", random_forest),
+            ("logistic_regression", logistic_regression)
+        ],
+        voting="soft"
+    )
+
+    # ======================================
+    # COMPLETE MACHINE LEARNING PIPELINE
+    # ======================================
+
     model = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
-            ("classifier", classifier)
+            ("classifier", ensemble_classifier)
         ]
     )
 
-    # Split dataset into training and testing
+    # ======================================
+    # SPLIT DATASET
+    # ======================================
+
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
@@ -102,28 +156,48 @@ def train_model():
     print("\nTraining samples:", len(X_train))
     print("Testing samples:", len(X_test))
 
-    print("\nTraining Random Forest model...")
+    # ======================================
+    # TRAIN MODEL
+    # ======================================
+
+    print("\nTraining Balanced Ensemble Classifier...")
+    print("Models: Random Forest + Logistic Regression")
 
     model.fit(X_train, y_train)
 
-    print("Model training completed!")
+    print("\nEnsemble training completed!")
 
-    # Predict on test data
+    # ======================================
+    # MODEL PREDICTIONS
+    # ======================================
+
     predictions = model.predict(X_test)
 
-    # Evaluate performance
+    # ======================================
+    # MODEL EVALUATION
+    # ======================================
+
     accuracy = accuracy_score(y_test, predictions)
+
     precision = precision_score(
-        y_test, predictions, zero_division=0
-    )
-    recall = recall_score(
-        y_test, predictions, zero_division=0
-    )
-    f1 = f1_score(
-        y_test, predictions, zero_division=0
+        y_test,
+        predictions,
+        zero_division=0
     )
 
-    print("\n========== MODEL PERFORMANCE ==========")
+    recall = recall_score(
+        y_test,
+        predictions,
+        zero_division=0
+    )
+
+    f1 = f1_score(
+        y_test,
+        predictions,
+        zero_division=0
+    )
+
+    print("\n========== ENSEMBLE PERFORMANCE ==========")
 
     print(f"Accuracy : {accuracy:.4f}")
     print(f"Precision: {precision:.4f}")
@@ -142,7 +216,10 @@ def train_model():
         )
     )
 
-    # Save the complete pipeline
+    # ======================================
+    # SAVE ENSEMBLE MODEL
+    # ======================================
+
     MODEL_PATH.parent.mkdir(
         parents=True,
         exist_ok=True
@@ -150,7 +227,7 @@ def train_model():
 
     joblib.dump(model, MODEL_PATH)
 
-    print("\nModel saved successfully!")
+    print("\nEnsemble model saved successfully!")
     print("Model location:", MODEL_PATH)
 
 
